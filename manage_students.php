@@ -92,11 +92,33 @@ $students = $stmt->fetchAll();
 <div class="container">
     <div class="management-card p-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="mb-0" style="color: #2c3e50;">Student Management</h2>
+            <div class="d-flex align-items-center gap-3">
+                <a href="teacher_dashboard.php" class="btn btn-back">
+                    <i class="bi bi-arrow-left me-2"></i>Back
+                </a>
+                <h2 class="mb-0" style="color: #2c3e50;">Student Management</h2>
+            </div>
             <a href="add_student.php" class="btn btn-add text-white">
                 <i class="bi bi-plus-lg me-2"></i>Add Student
             </a>
         </div>
+
+        <style>
+            .btn-back {
+                background: rgba(127, 127, 213, 0.1);
+                color: #7f7fd5;
+                border: 2px solid #7f7fd5;
+                border-radius: 8px;
+                padding: 8px 20px;
+                transition: all 0.3s;
+            }
+            .btn-back:hover {
+                background: #7f7fd5;
+                color: white;
+                transform: translateY(-2px);
+            }
+        </style>
+        
 
         <?php if(empty($students)): ?>
             <div class="alert alert-info d-flex align-items-center">
