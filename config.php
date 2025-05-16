@@ -3,7 +3,7 @@ session_start();
 $host = 'localhost';
 $dbname = 'grade_system';
 $user = 'root';
-$pass = '';
+$pass = 'root';
 
 try {
     $conn = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $user, $pass);
