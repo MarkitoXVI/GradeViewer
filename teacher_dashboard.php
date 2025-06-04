@@ -28,8 +28,10 @@ include 'header.php';
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-2">
-                            <img src="<?= $teacher['avatar'] ? 'uploads/'.$teacher['avatar'] : 'https://via.placeholder.com/150' ?>" 
-                                 class="img-thumbnail" alt="Profile Picture">
+                        <img src="<?= $teacher['avatar'] ? 'uploads/'.$teacher['avatar'] : 'default.jpg' ?>" 
+     class="img-thumbnail" 
+     alt="Profile Picture"
+     style="width: 50px; height: 50px; object-fit: cover;">
                         </div>
                         <div class="col-md-10">
                             <h2>Welcome, <?= htmlspecialchars($teacher['first_name'].' '.$teacher['last_name']) ?></h2>

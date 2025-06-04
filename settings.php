@@ -1,13 +1,14 @@
 <?php
 include 'config.php';
 
-// Verify teacher login
+
+// Pārbauda lietotāju
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
     header("Location: index.php");
     exit();
 }
 
-// Get current teacher data
+// Iegūstam skolotāja datus
 $stmt = $conn->prepare("SELECT * FROM Teachers WHERE ID = ?");
 $stmt->execute([$_SESSION['user_id']]);
 $teacher = $stmt->fetch();
@@ -15,45 +16,76 @@ $teacher = $stmt->fetch();
 $error = '';
 $success = '';
 
-// Handle form submission
+// Apstrādājam formas iesniegšanu
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        // Update basic info
-        $first_name = sanitizeInput($_POST['first_name']);
-        $last_name = sanitizeInput($_POST['last_name']);
+        // Sagatavojam mainīgos
+        $first_name = trim($_POST['first_name']);
+        $last_name = trim($_POST['last_name']);
+        $avatar = $teacher['avatar']; // Esošais avatars
         
-        // Password update
+        // Apstrādājam paroli
         $password_update = '';
-        if (!empty($_POST['new_password'])) {
-            if (strlen($_POST['new_password']) < 8) {
-                throw new Exception("Password must be at least 8 characters");
-            }
-            $hashed_password = password_hash($_POST['new_password'], PASSWORD_DEFAULT);
-            $password_update = ", password = :password";
-        }
-
-        // Update query
-        $sql = "UPDATE Teachers SET 
-                first_name = :first_name,
-                last_name = :last_name
-                $password_update
-                WHERE ID = :id";
-
-        $stmt = $conn->prepare($sql);
         $params = [
             ':first_name' => $first_name,
             ':last_name' => $last_name,
             ':id' => $_SESSION['user_id']
         ];
         
-        if (!empty($hashed_password)) {
-            $params[':password'] = $hashed_password;
+        if (!empty($_POST['new_password'])) {
+            if (strlen($_POST['new_password']) < 8) {
+                throw new Exception("Parolei jābūt vismaz 8 simbolus garai");
+            }
+            $password_update = ", password = :password";
+            $params[':password'] = password_hash($_POST['new_password'], PASSWORD_DEFAULT);
         }
-
-        $stmt->execute($params);
-        $success = "Profile updated successfully!";
         
-        // Refresh teacher data
+        // Apstrādājam avataru
+        if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
+            $uploadDir = 'uploads/';
+            if (!file_exists($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+            
+            // Pārbaudam faila tipu
+            $allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+            if (!in_array($_FILES['avatar']['type'], $allowedTypes)) {
+                throw new Exception("Atļauti tikai JPG, PNG vai GIF attēli");
+            }
+            
+            // Ģenerējam unikālu faila nosaukumu
+            $fileExt = pathinfo($_FILES['avatar']['name'], PATHINFO_EXTENSION);
+            $fileName = 'avatar_'.$_SESSION['user_id'].'_'.time().'.'.$fileExt;
+            $targetPath = $uploadDir.$fileName;
+            
+            // Pārvietojam failu
+            if (move_uploaded_file($_FILES['avatar']['tmp_name'], $targetPath)) {
+                // Dzēšam veco avataru
+                if (!empty($teacher['avatar']) && file_exists($uploadDir.$teacher['avatar'])) {
+                    unlink($uploadDir.$teacher['avatar']);
+                }
+                $avatar = $fileName;
+            } else {
+                throw new Exception("Neizdevās augšupielādēt attēlu");
+            }
+        }
+        
+        $params[':avatar'] = $avatar;
+        
+        // Veicam atjaunināšanu datubāzē
+        $sql = "UPDATE Teachers SET 
+                first_name = :first_name,
+                last_name = :last_name,
+                avatar = :avatar
+                $password_update
+                WHERE ID = :id";
+        
+        $stmt = $conn->prepare($sql);
+        $stmt->execute($params);
+        
+        $success = "Profila iestatījumi veiksmīgi atjaunināti!";
+        
+        // Atjauninam skolotāja datus
         $stmt = $conn->prepare("SELECT * FROM Teachers WHERE ID = ?");
         $stmt->execute([$_SESSION['user_id']]);
         $teacher = $stmt->fetch();
@@ -64,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 include 'header.php';
+
 ?>
 
 <style>
@@ -147,39 +180,35 @@ include 'header.php';
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="settings-card p-4">
-                <div class="text-center mb-4">
+            <div class="text-center mb-4">
                     <h3 class="mb-3" style="color: #2c3e50;">Profile Settings</h3>
-                    <div class="avatar-container position-relative d-inline-block">
-                        <img src="<?= $teacher['avatar'] ? 'uploads/'.$teacher['avatar'] : 'https://via.placeholder.com/150' ?>" 
-                             class="profile-avatar rounded-circle" 
-                             alt="Profile Avatar">
-                        <div class="mt-3">
-                            <div class="file-upload">
-                                <input type="file" name="avatar" id="avatarInput" 
-                                       class="file-upload-input" accept="image/*">
-                                <label for="avatarInput" class="file-upload-label">
-                                    <i class="bi bi-camera me-2"></i>Change Photo
-                                </label>
+                
+                      
+                
+                <form method="POST" enctype="multipart/form-data" id="profileForm">
+                    <!-- Avatar Section -->
+                    <div class="text-center mb-4">
+                        <div class="avatar-container position-relative d-inline-block">
+                            <img src="<?= !empty($teacher['avatar']) ? 'uploads/'.$teacher['avatar'] : 'default.jpg' ?>" 
+                                 id="avatarPreview"
+                                 class="profile-avatar rounded-circle" 
+                                 style="width: 180px; height: 180px; object-fit: cover;"
+                                 alt="Profile Avatar">
+                            <div class="mt-3">
+                                <div class="file-upload">
+                                    <input type="file" name="avatar" id="avatarInput" 
+                                           class="file-upload-input" accept="image/*">
+                                    <label for="avatarInput" class="file-upload-label">
+                                        <i class="bi bi-camera me-2"></i>Change Photo
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <?php if ($error): ?>
-                <div class="alert alert-danger d-flex align-items-center" role="alert">
-                    <i class="bi bi-exclamation-circle-fill me-2"></i>
-                    <div><?= $error ?></div>
-                </div>
-                <?php endif; ?>
-                
-                <?php if ($success): ?>
-                <div class="alert alert-success d-flex align-items-center" role="alert">
-                    <i class="bi bi-check-circle-fill me-2"></i>
-                    <div><?= $success ?></div>
-                </div>
-                <?php endif; ?>
-
-                <form method="POST" enctype="multipart/form-data">
+                    
+                    <form method="POST" enctype="multipart/form-data" id="profileForm">
+                    <input type="hidden" name="form_submitted" value="1">
+                    
                     <div class="mb-4">
                         <label class="form-label fw-bold mb-2" style="color: #4a5568;">First Name</label>
                         <input type="text" 
@@ -208,17 +237,37 @@ include 'header.php';
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center mt-5">
-                        <a href="teacher_dashboard.php" class="text-decoration-none" style="color: #7f7fd5;">
-                            <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
-                        </a>
-                        <button type="submit" class="btn btn-save">
+                        <button type="submit" class="btn btn-save" id="submitBtn">
                             <i class="bi bi-save me-2"></i>Save Changes
                         </button>
+                        
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+                    
+                   
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const avatarInput = document.getElementById('avatarInput');
+    const avatarPreview = document.getElementById('avatarPreview');
+    
+    if (avatarInput) {
+        avatarInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    avatarPreview.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+});
+</script>
 
 <?php include 'footer.php'; ?>
